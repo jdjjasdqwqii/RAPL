@@ -66,6 +66,7 @@ We provide training scripts in the scripts folder. For instance, to launch the t
 ## Few-shots classification results (ViT-B/16, 16 shots)
 <img width="1368" height="397" alt="image" src="https://github.com/user-attachments/assets/ac4013f4-575d-4bd3-b02e-2985feed816e" />
 Table 1: Comparison of ID Top-1 accuracy with SOTA prompt learning approaches across benchmark datasets.
+
 ## Imagenet out-of-detection results (ViT-B/16, 16 shots)
 <img width="1375" height="807" alt="image" src="https://github.com/user-attachments/assets/45053ce7-b389-4ba8-829e-5894f0681302" />
 Table 2: Comparison of OOD detection performance with SOTA approaches across four OOD datasets. We report FPR95↓ and
