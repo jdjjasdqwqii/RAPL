@@ -6,7 +6,7 @@
   <img src="https://github.com/user-attachments/assets/40b255c8-eb02-48b0-bbba-9138248b18fe" width="800">
 </p>
 
-Figure 2: Overview of the proposed method. Our framework combines global and local prompts to guide region-level understanding. Global prompts guide region generation (e.g., via Grounded SAM), while local prompts adapt to specific regions for fine-grained recognition and OOD detection.
+
 
 ## Installation
 
