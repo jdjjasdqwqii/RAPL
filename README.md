@@ -17,7 +17,7 @@ pip install -r requirements.txt
 
 ##  Datasets
 
-Please follow instructions in the [CoOp](https://github.com/KaiyangZhou/CoOp) repository to download the datasets used for the few-shot image classification and domain generalization experiments. Note that downloading the class names and splits (e.g. `split_zhou_Caltech101.json`) is not required as they are already included in the `gallop/datasets` folder.  
+Please follow instructions in the [CoOp](https://github.com/KaiyangZhou/CoOp) repository to download the datasets used for the few-shot image classification and domain generalization experiments. Note that downloading the class names and splits (e.g. `split_zhou_Caltech101.json`) is not required as they are already included in the `rarl/datasets` folder.  
 
 For the out-of-distribution experiments, we use the following datasets curated by Huang et al. (2021):  
 
