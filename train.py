@@ -14,16 +14,16 @@ from clip.clip import _transform
 from timm.utils import accuracy
 
 import sys
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '/home/duanzhenya/ood/gallop777/')))
-import gallop.lib as lib
-import gallop.vlprompt.tools as vlp_tools
-import gallop.datasets.tools as dts_tools
-from gallop.datasets import return_train_val_datasets, return_ood_loaders, return_domains_loaders
-from gallop.vlprompt import GalLoP
-from gallop.vlprompt.tools import GlobalLocalLoss
-from gallop.vlprompt.region_feature import get_region_features, RegionFeatureProjector, select_regions, augment_region
-from gallop.vlprompt.gallop import select_regions_by_text_similarity
-from gallop.vlprompt.grounded_sam2_utils import (
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '')))
+import rapl.lib as lib
+import rapl.vlprompt.tools as vlp_tools
+import rapl.datasets.tools as dts_tools
+from rapl.datasets import return_train_val_datasets, return_ood_loaders, return_domains_loaders
+from rapl.vlprompt import Rapl
+from rapl.vlprompt.tools import GlobalLocalLoss
+from rapl.vlprompt.region_feature import get_region_features, RegionFeatureProjector, select_regions, augment_region
+from rapl.vlprompt.gallop import select_regions_by_text_similarity
+from rapl.vlprompt.grounded_sam2_utils import (
     load_groundingdino_model, 
     get_grounded_sam2_features,
     get_grounded_sam2_features_batch,
@@ -33,7 +33,7 @@ from gallop.vlprompt.grounded_sam2_utils import (
 from sam2.build_sam import build_sam2
 from sam2.sam2_image_predictor import SAM2ImagePredictor
 
-# GroundingDINO imports - 使用直接路径导入
+# GroundingDINO imports 
 import sys
 import os
 gsam2_path = os.path.join(os.path.dirname(__file__), "..", "Grounded-SAM-2-main")
@@ -85,24 +85,24 @@ def train_one_epoch(
         targets = batch["target"].cuda(non_blocking=True)
         prompts = batch["prompt"] if "prompt" in batch else [class_names[t.item()] for t in targets]
         
-        # 使用 Grounded SAM2 或原来的 SAM2
+        
         if args.use_groundingdino and groundingdino_model is not None:
-            # Grounded SAM2 pipeline - 批量版本，支持多卡并行
+            # Grounded SAM2 pipeline 
             region_features_list = get_grounded_sam2_features_batch(
                 images, prompts, groundingdino_model, sam2_model, sam_proj,
                 box_threshold=args.box_threshold, text_threshold=args.text_threshold
             )
-            # 将list转换为tensor，处理不同数量的region
+           
             max_regions = max([len(feats) for feats in region_features_list]) if region_features_list else 1
             region_features = torch.zeros(images.size(0), max_regions, region_features_list[0][0].shape[-1]).cuda()
             for b, feats in enumerate(region_features_list):
                 if len(feats) > 0:
                     region_features[b, :len(feats)] = torch.stack(feats)
         else:
-            # 原来的 SAM2 patch embedding
+            
             region_features = get_region_features(images, sam2_model, sam_proj)
         
-        # 使用模型编码文本特征
+       
         text_features, _ = model.encode_text(prompts)
         k = max(1, region_features.shape[1] // 5)
         pos_indices, neg_indices = select_regions_by_text_similarity(region_features, text_features, k)
@@ -121,7 +121,7 @@ def train_one_epoch(
                 pos_region_features=pos_region_features,
                 neg_region_features=neg_region_features,
             )
-            # 获取image_features和text_features用于prompt masking
+           
             image_features, _ = model.encode_image_and_proj(images)
             image_features = image_features / image_features.norm(dim=-1, keepdim=True)
             if hasattr(model, 'global_prompt') and model.learn_global_prompt:
@@ -191,7 +191,7 @@ def evaluate(
 
         with autocast(enabled=args.use_fp16):
             global_logits, local_logits, neg_local_logits = model(images, text_features=text_features, local_text_features=local_text_features)
-            # 撤销推理时的prompt masking，不再获取image_features和text_features_mask
+           
             if return_scores:
                 test_scores[batch["index"].numpy()] = model.compute_scores(global_logits, local_logits)
 
@@ -231,7 +231,7 @@ def evaluate(
 
 @torch.no_grad()
 def evaluate_ood(
-    model: GalLoP,
+    model: Rapl,
     val_loader: DataLoader,
     ood_loaders: Dict[str, DataLoader],
     args: argparse.Namespace,
@@ -254,7 +254,7 @@ def evaluate_ood(
             images = batch["image"].cuda(non_blocking=True)
             with autocast(enabled=args.use_fp16):
                 global_logits, local_logits, neg_local_logits = model(images, text_features=text_features, local_text_features=local_text_features)
-                # 撤销推理时的prompt masking，不再获取image_features和text_features_mask
+               
                 test_scores[batch["index"].numpy()] = model.compute_scores(global_logits, local_logits)
 
     for ood_name, ood_loader in ood_loaders.items():
@@ -283,8 +283,8 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser("Learning prompts for CLIP with local and global features")
     parser.add_argument("--exp_name", default=None, type=str)
-    parser.add_argument("--data_dir", default="/home/duanzhenya/ood/gallop777/gallop/DATA", type=str)
-    parser.add_argument("--save_dir", default="./results/result", type=str)
+    parser.add_argument("--data_dir", default="", type=str)
+    parser.add_argument("--save_dir", default="", type=str)
     parser.add_argument("--checkpoint_path", default=None, type=str)
     parser.add_argument("--dataset_name", default="imagenet", type=str)
     parser.add_argument("--eval_only", default=False, type=lib.boolean_flags)
@@ -332,13 +332,13 @@ if __name__ == "__main__":
     parser.add_argument("--save_freq", default=5, type=int)
     parser.add_argument("--print_freq", default=20, type=int)
 
-    parser.add_argument("--sam2_config", type=str, required=True, default="/home/duanzhenya/ood/gallop777/Grounded-SAM-2-main/sam2/configs/sam2/sam2_hiera_t.yaml",help="Path to SAM2 config yaml")
-    parser.add_argument("--sam2_ckpt", type=str, required=True,default="/home/duanzhenya/ood/gallop777/Grounded-SAM-2-main/checkpoints/sam2_hiera_tiny.pt", help="Path to SAM2 checkpoint")
+    parser.add_argument("--sam2_config", type=str, required=True, default="",help="Path to SAM2 config yaml")
+    parser.add_argument("--sam2_ckpt", type=str, required=True,default="", help="Path to SAM2 checkpoint")
     
     # GroundingDINO parameters
-    parser.add_argument("--groundingdino_config", type=str, default="/home/duanzhenya/ood/gallop777/Grounded-SAM-2-main/grounding_dino/groundingdino/config/GroundingDINO_SwinT_OGC.py",
+    parser.add_argument("--groundingdino_config", type=str, default="",
         help="Path to GroundingDINO config")
-    parser.add_argument("--groundingdino_ckpt", type=str, default="/home/duanzhenya/ood/gallop777/Grounded-SAM-2-main/gdino_checkpoints/groundingdino_swint_ogc.pth",
+    parser.add_argument("--groundingdino_ckpt", type=str, default="",
         help="Path to GroundingDINO checkpoint")
     parser.add_argument("--box_threshold", type=float, default=0.35, help="GroundingDINO box confidence threshold")
     parser.add_argument("--text_threshold", type=float, default=0.25, help="GroundingDINO text confidence threshold")
@@ -346,10 +346,10 @@ if __name__ == "__main__":
 
     parser.add_argument("--region_select_mode", type=str, default="combined",
         choices=["all", "most_similar", "least_similar", "most_confident", "least_confident", "combined"],
-        help="区域筛选方式，用于消融实验")
+        help="")
     parser.add_argument("--region_augment_mode", type=str, default="occlude",
-        choices=["none", "occlude", "jitter"], help="区域增强方式")
-    parser.add_argument("--region_topk", type=int, default=1, help="每种方式选几个区域")
+        choices=["none", "occlude", "jitter"], help="")
+    parser.add_argument("--region_topk", type=int, default=1, help="")
 
     args = parser.parse_args()
 
@@ -389,7 +389,7 @@ if __name__ == "__main__":
 
 
     # Setting-up model
-    model = GalLoP(
+    model = Rapl(
         clip_name=args.clip_name,
         use_local_features=args.use_local_features,
         checkpointing_segments=args.checkpointing_segments,
@@ -416,7 +416,7 @@ if __name__ == "__main__":
     model.freeze_clip()
     model = model.cuda()
 
-    # 加载 GroundingDINO 模型
+   
     groundingdino_model = None
     if args.use_groundingdino:
         groundingdino_model = load_groundingdino_model(
@@ -426,10 +426,10 @@ if __name__ == "__main__":
         )
         
         if groundingdino_model is not None:
-            # 多卡并行
+           
             if torch.cuda.device_count() > 1:
                 groundingdino_model = torch.nn.DataParallel(groundingdino_model)
-            # 冻结参数
+           
             groundingdino_model.eval()
             for param in groundingdino_model.parameters():
                 param.requires_grad = False
@@ -438,11 +438,10 @@ if __name__ == "__main__":
             print("⚠️  GroundingDINO 模型加载失败，将仅使用 SAM2")
             args.use_groundingdino = False
     
-    # 加载 SAM2 模型
-    # 检查配置文件路径
+   
     sam2_config_path = args.sam2_config
     if not os.path.isabs(sam2_config_path):
-        # 如果是相对路径，转换为绝对路径
+      
         sam2_config_path = os.path.abspath(sam2_config_path)
     
     print(f"🔧 使用 SAM2 配置文件: {sam2_config_path}")
@@ -459,28 +458,27 @@ if __name__ == "__main__":
             m.train = lambda _: None
     sam2_predictor = SAM2ImagePredictor(sam2_model)
 
-    # 自动推断sam特征维度和clip特征维度，初始化sam_proj
-    # 取一张图片推理一次，获得region_features.shape[-1]和clip特征维度
+   
     dummy_img = torch.randn(1, 3, 224, 224).cuda()
     dummy_prompts = ["a photo of a cat"]
     
     with torch.no_grad():
         if args.use_groundingdino and groundingdino_model is not None:
-            # 使用 Grounded SAM2 - 批量版本
+           
             region_features_list = get_grounded_sam2_features_batch(
                 dummy_img, dummy_prompts, groundingdino_model, sam2_predictor,
                 box_threshold=args.box_threshold, text_threshold=args.text_threshold
             )
-            # 取第一个batch的第一个region特征
+           
             if len(region_features_list) > 0 and len(region_features_list[0]) > 0:
                 sam_dim = region_features_list[0][0].shape[-1]
             else:
-                # 如果没有检测到区域，用SAM2的patch embedding
+               
                 image_features = sam2_model.get_image_embedding(dummy_img)
                 sam_dim = image_features.shape[1]
         else:
-            # 使用原来的SAM2 patch embedding
-            region_features = get_region_features(dummy_img, sam2_model, None)  # sam_proj 还没有初始化
+           
+            region_features = get_region_features(dummy_img, sam2_model, None) 
             sam_dim = region_features.shape[-1]
         
         text_features, _ = model.encode_text(["a photo of a cat"])
