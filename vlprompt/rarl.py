@@ -12,11 +12,11 @@ import torch.nn.functional as F
 
 from clip import load as load_clip
 
-import gallop.lib as lib
-import gallop.vlprompt.tools as vlp_tools
-from gallop.vlprompt.prompted_transformers import PromptedTransformer
-from gallop.vlprompt.clip_local import ModifiedResNet, VisionTransformer, CLIP
-# GroundingDINO imports - 使用直接路径导入
+import rapl.lib as lib
+import rapl.vlprompt.tools as vlp_tools
+from rapl.vlprompt.prompted_transformers import PromptedTransformer
+from rapl.vlprompt.clip_local import ModifiedResNet, VisionTransformer, CLIP
+
 import sys
 import os
 gsam2_path = os.path.join(os.path.dirname(__file__), "..", "..", "Grounded-SAM-2-main")
@@ -34,7 +34,7 @@ KwargType = Dict[str, Any]
 CLIP_NAME = {"clip_vit_b32": "ViT-B/32", "clip_vit_b16": "ViT-B/16", "clip_resnet50": "RN50", "clip_resnet101": "RN101"}
 
 
-class GalLoP(CLIP):
+class Rapl(CLIP):
     TRAINABLE_PARAMS: List[str] = []
 
     def __init__(
@@ -147,7 +147,7 @@ class GalLoP(CLIP):
         self.transformer = self.transformer if not self.parallel_text_encoder else vlp_tools.DataParallel(self.transformer)
         self.visual = self.visual if not self.parallel_vision_encoder else vlp_tools.DataParallel(self.visual)
 
-    @property
+
     def num_devices(self) -> int:
         if not hasattr(self, "__device"):
             self.__device = torch.cuda.device_count()
@@ -335,7 +335,7 @@ class GalLoP(CLIP):
 
         return global_prompt_features, local_prompt_features
 
-    @property
+    
     def device(self) -> torch.device:
         return self.text_projection.device
 
@@ -375,7 +375,7 @@ class GalLoP(CLIP):
 
         return _IncompatibleKeys(missing_keys=missing_keys, unexpected_keys=keys.unexpected_keys)
 
-    @torch.no_grad()
+   
     def initialize_prompt(self) -> NoneType:
         if not self.learn_global_prompt and not self.learn_local_prompts:
             return
@@ -477,27 +477,19 @@ class GalLoP(CLIP):
         return neg_text_features
 
 def select_regions_by_text_similarity(region_features, text_feature, k, sim_threshold=0.4):
-    """
-    输入：
-        region_features: [N, D] 或 [B, N, D]
-        text_feature: [D] 或 [B, D]
-        k: int, 正/负样本数量
-        sim_threshold: float, 相似度阈值
-    输出：
-        pos_indices, neg_indices: 正负样本索引
-    """
+    
     if region_features.dim() == 2:
-        # 单张图片
+        
         sim = F.cosine_similarity(region_features, text_feature.unsqueeze(0), dim=-1)  # [N]
         mask = sim > sim_threshold
         valid_indices = mask.nonzero(as_tuple=True)[0]
         if valid_indices.numel() == 0:
-            pos_indices = sim.topk(k).indices  # 若无高于阈值的区域，退化为topk
+            pos_indices = sim.topk(k).indices 
         else:
             k_eff = min(k, valid_indices.numel())
             pos_indices = sim[valid_indices].topk(k_eff).indices
             pos_indices = valid_indices[pos_indices]
-        # 负样本为低于阈值的区域，若不足k则补足
+        
         neg_mask = ~mask
         neg_indices = neg_mask.nonzero(as_tuple=True)[0]
         if neg_indices.numel() < k:
@@ -507,11 +499,11 @@ def select_regions_by_text_similarity(region_features, text_feature, k, sim_thre
             neg_indices = neg_indices[:k]
         return pos_indices, neg_indices
     elif region_features.dim() == 3:
-        # 批量图片
+      
         B, N, D = region_features.shape
         pos_indices, neg_indices = [], []
         for b in range(B):
-            sim = F.cosine_similarity(region_features[b], text_feature[b].unsqueeze(0), dim=-1)  # [N]
+            sim = F.cosine_similarity(region_features[b], text_feature[b].unsqueeze(0), dim=-1)  
             mask = sim > sim_threshold
             valid_indices = mask.nonzero(as_tuple=True)[0]
             if valid_indices.numel() == 0:
